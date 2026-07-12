@@ -207,8 +207,8 @@
           <div id="equipeField" style="display:none;">
             <label>Equipe</label>
             <select id="pEquipe">
-              <option value="Equipe 1">Equipe 1</option>
-              <option value="Equipe 2">Equipe 2</option>
+              <option value="Equipe 1">Remanescentes</option>
+              <option value="Equipe 2">Flechas Incendiadas</option>
             </select>
           </div>
 
@@ -235,8 +235,8 @@
           <input type="text" id="novoNome" placeholder="Nome completo">
           <label>Equipe</label>
           <select id="novoTime">
-            <option value="Equipe 1">Equipe 1</option>
-            <option value="Equipe 2">Equipe 2</option>
+            <option value="Equipe 1">Remanescentes</option>
+            <option value="Equipe 2">Flechas Incendiadas</option>
           </select>
           <button class="btn btn-primary" style="margin-top:14px;" onclick="addAluno()">Adicionar</button>
         </div>
@@ -352,6 +352,8 @@ function switchView(name){
 }
 
 const TEAMS = ['Equipe 1', 'Equipe 2'];
+const TEAM_LABELS = { 'Equipe 1': 'Remanescentes', 'Equipe 2': 'Flechas Incendiadas' };
+function teamLabel(team){ return TEAM_LABELS[team] || team; }
 
 function teamList(){
   return TEAMS;
@@ -392,7 +394,7 @@ function renderBattleBar(){
     const pts = totals[i];
     const grow = Math.max(pts,5) / (totals.reduce((s,v)=>s+Math.max(v,5),0)||1);
     return `<div class="battle-side" style="flex-grow:${grow};background:${i===0?'rgba(240,180,41,0.12)':'rgba(34,211,238,0.12)'};">
-      <div class="name" style="color:${teamColor(i)}">${escapeHtml(t)}</div>
+      <div class="name" style="color:${teamColor(i)}">${escapeHtml(teamLabel(t))}</div>
       <div class="pts" style="color:${teamColor(i)}">${pts}</div>
     </div>`;
   }).join('') + (teams.length>1 ? '<div class="battle-vs">VS</div>' : '');
@@ -465,7 +467,7 @@ function isPresente(nome, sessao){
 function renderTeamSwitch(){
   const el = document.getElementById('teamSwitch');
   el.innerHTML = TEAMS.map((team,ti)=>`
-    <div class="team-switch-btn ${team===selectedTeam?'sel-'+ti:''}" onclick="selectTeam('${escapeAttr(team)}')">${escapeHtml(team)}</div>
+    <div class="team-switch-btn ${team===selectedTeam?'sel-'+ti:''}" onclick="selectTeam('${escapeAttr(team)}')">${escapeHtml(teamLabel(team))}</div>
   `).join('');
 }
 
@@ -553,7 +555,7 @@ async function submitPonto(){
 
   if(pontosMode === 'equipe'){
     time = document.getElementById('pEquipe').value;
-    nome = time;
+    nome = teamLabel(time);
   } else {
     const sel = document.getElementById('pAluno');
     if(!sel.value){ toast('Cadastre e escolha um adolescente'); return; }
@@ -589,7 +591,7 @@ function renderAlunosList(){
         <button class="del-btn" onclick="removeAluno('${escapeAttr(a.Nome)}')">✕</button>
       </div>
     `).join('');
-    return `<div class="team-group-title" style="color:${teamColor(ti)}">${escapeHtml(team)}</div>${rows}`;
+    return `<div class="team-group-title" style="color:${teamColor(ti)}">${escapeHtml(teamLabel(team))}</div>${rows}`;
   }).join('');
 }
 
