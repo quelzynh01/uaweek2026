@@ -97,6 +97,7 @@
   .dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;}
   .toggle{border:1px solid rgba(244,83,107,0.35);background:rgba(244,83,107,0.1);color:var(--danger);font-size:12px;font-weight:700;border-radius:8px;padding:7px 12px;cursor:pointer;white-space:nowrap;}
   .toggle.on{background:rgba(52,211,153,0.15);border-color:var(--success);color:var(--success);}
+  .toggle.sm{padding:7px 10px;font-size:10.5px;}
 
   .empty{color:var(--text-dim);font-size:13px;text-align:center;padding:24px 0;}
 
@@ -144,7 +145,7 @@
 <div id="app" style="display:none;">
 
   <div class="hero">
-    <div class="eyebrow">12 — 18 de julho · 2026</div>
+    <div class="eyebrow">12 — 19 de julho · 2026</div>
     <h1>UA WEEK</h1>
     <div class="dates">Presença e pontuação da semana</div>
     <div class="battle-bar" id="battleBar"></div>
@@ -173,7 +174,7 @@
       </section>
       <section>
         <div class="team-switch" id="teamSwitch"></div>
-        <div class="section-title">Marcar presença · +10 pts (dia 12: +20 pts)</div>
+        <div class="section-title">Marcar presença · +10 pts cada</div>
         <div class="card" id="presencaList"></div>
       </section>
     </div>
@@ -419,8 +420,13 @@ function selectDay(num){
   renderPresencaList();
 }
 
-function isPresente(nome){
-  return registros.find(r=>r.Nome===nome && Number(r.Data)===Number(selectedDay) && r.Tipo==='Presença');
+function tipoPresenca(sessao){
+  return sessao ? ('Presença '+sessao) : 'Presença';
+}
+
+function isPresente(nome, sessao){
+  const tipo = tipoPresenca(sessao);
+  return registros.find(r=>r.Nome===nome && Number(r.Data)===Number(selectedDay) && r.Tipo===tipo);
 }
 
 function renderTeamSwitch(){
@@ -441,25 +447,36 @@ function renderPresencaList(){
   if(alunos.length===0){ el.innerHTML = '<div class="empty">Cadastre adolescentes na aba Equipe</div>'; return; }
   const list = alunos.filter(a=>(a.Time||'')===selectedTeam);
   if(list.length===0){ el.innerHTML = '<div class="empty">Nenhum adolescente nessa equipe ainda</div>'; return; }
-  el.innerHTML = list.map(a=>{
-    const reg = isPresente(a.Nome);
-    return `<div class="presenca-row">
-      <div class="presenca-name">${escapeHtml(a.Nome)}</div>
-      <button class="toggle ${reg?'on':''}" onclick="togglePresenca('${escapeAttr(a.Nome)}','${escapeAttr(a.Time||'')}')">${reg?'✓ Presente':'Ausente'}</button>
-    </div>`;
-  }).join('');
+
+  if(Number(selectedDay) === 12){
+    el.innerHTML = list.map(a=>{
+      const manha = isPresente(a.Nome, 'Manhã');
+      const noite = isPresente(a.Nome, 'Noite');
+      return `<div class="presenca-row">
+        <div class="presenca-name">${escapeHtml(a.Nome)}</div>
+        <div style="display:flex;gap:6px;">
+          <button class="toggle sm ${manha?'on':''}" onclick="togglePresenca('${escapeAttr(a.Nome)}','${escapeAttr(a.Time||'')}','Manhã')">${manha?'✓ Manhã':'Manhã'}</button>
+          <button class="toggle sm ${noite?'on':''}" onclick="togglePresenca('${escapeAttr(a.Nome)}','${escapeAttr(a.Time||'')}','Noite')">${noite?'✓ Noite':'Noite'}</button>
+        </div>
+      </div>`;
+    }).join('');
+  } else {
+    el.innerHTML = list.map(a=>{
+      const reg = isPresente(a.Nome, null);
+      return `<div class="presenca-row">
+        <div class="presenca-name">${escapeHtml(a.Nome)}</div>
+        <button class="toggle ${reg?'on':''}" onclick="togglePresenca('${escapeAttr(a.Nome)}','${escapeAttr(a.Time||'')}',null)">${reg?'✓ Presente':'Ausente'}</button>
+      </div>`;
+    }).join('');
+  }
 }
 
-function pontosDoDia(dayNum){
-  return Number(dayNum) === 12 ? 20 : 10;
-}
-
-async function togglePresenca(nome, time){
-  const existing = isPresente(nome);
+async function togglePresenca(nome, time, sessao){
+  const existing = isPresente(nome, sessao);
   if(existing){
     await postAction({ action:'deleteRegistro', id: existing.ID });
   } else {
-    await postAction({ action:'addRegistro', nome, time, tipo:'Presença', pontos:pontosDoDia(selectedDay), data:selectedDay, obs:'' });
+    await postAction({ action:'addRegistro', nome, time, tipo:tipoPresenca(sessao), pontos:10, data:selectedDay, obs:'' });
   }
   await loadData();
 }
@@ -517,6 +534,7 @@ function renderAlunosList(){
     const rows = list.map(a=>`
       <div class="aluno-row">
         <div class="info"><div class="n">${escapeHtml(a.Nome)}</div></div>
+        <button class="del-btn" onclick="editAluno('${escapeAttr(a.Nome)}','${escapeAttr(a.Time||'')}')">✎</button>
         <button class="del-btn" onclick="removeAluno('${escapeAttr(a.Nome)}')">✕</button>
       </div>
     `).join('');
@@ -541,6 +559,18 @@ async function removeAluno(nome){
   if(!confirm('Remover ' + nome + ' da lista? (o histórico de pontos permanece registrado)')) return;
   await postAction({ action:'deleteAluno', nome });
   await loadData();
+}
+
+async function editAluno(nomeAtual, time){
+  const novoNome = prompt('Editar nome:', nomeAtual);
+  if(!novoNome) return;
+  const nomeFinal = novoNome.trim();
+  if(!nomeFinal || nomeFinal === nomeAtual) return;
+  const ok = await postAction({ action:'renameAluno', oldNome: nomeAtual, newNome: nomeFinal, time });
+  if(ok){
+    toast('Nome atualizado!');
+    await loadData();
+  }
 }
 
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
