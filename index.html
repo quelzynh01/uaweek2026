@@ -62,12 +62,19 @@
 
   /* CARDS */
   .card{background:var(--bg-elev);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px;}
-  .rank-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);}
+  .rank-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);border-radius:10px;}
   .rank-row:last-child{border-bottom:none;}
-  .rank-num{width:22px;font-family:'Archivo Black';font-size:14px;color:var(--text-dim);text-align:center;}
+  .rank-num{width:24px;font-family:'Archivo Black';font-size:16px;color:var(--text-dim);text-align:center;}
   .rank-name{flex:1;font-weight:600;font-size:14.5px;}
   .rank-team{font-size:10px;color:var(--text-dim);text-transform:uppercase;}
   .rank-pts{font-family:'Archivo Black';font-size:16px;}
+  .rank-row.rank-gold{background:rgba(240,180,41,0.10);margin:0 -14px;padding:10px 14px;}
+  .rank-row.rank-silver{background:rgba(197,206,224,0.08);margin:0 -14px;padding:10px 14px;}
+  .rank-row.rank-bronze{background:rgba(205,127,50,0.08);margin:0 -14px;padding:10px 14px;}
+  .rank-row.rank-gold .rank-name{color:var(--gold);}
+  .rank-row.rank-silver .rank-name{color:#c5cee0;}
+  .rank-row.rank-bronze .rank-name{color:#cd7f32;}
+  .rank-row.rank-gold .rank-num,.rank-row.rank-silver .rank-num,.rank-row.rank-bronze .rank-num{font-size:19px;}
 
   .btn{appearance:none;border:none;border-radius:10px;padding:12px 16px;font-family:'Inter';font-weight:700;font-size:14px;cursor:pointer;width:100%;}
   .btn-primary{background:var(--gold);color:#171200;}
@@ -188,8 +195,22 @@
       <section>
         <div class="section-title">Lançar pontos ou penalidade</div>
         <div class="card">
-          <label>Adolescente</label>
-          <select id="pAluno"></select>
+          <div class="team-switch" id="modeSwitch">
+            <div class="team-switch-btn sel-0" id="modeIndBtn" onclick="setPontosMode('individual')">Individual</div>
+            <div class="team-switch-btn" id="modeEquipeBtn" onclick="setPontosMode('equipe')">Equipe</div>
+          </div>
+
+          <div id="alunoField">
+            <label>Adolescente</label>
+            <select id="pAluno"></select>
+          </div>
+          <div id="equipeField" style="display:none;">
+            <label>Equipe</label>
+            <select id="pEquipe">
+              <option value="Equipe 1">Equipe 1</option>
+              <option value="Equipe 2">Equipe 2</option>
+            </select>
+          </div>
 
           <label>Motivo</label>
           <div class="type-grid" id="typeGrid"></div>
@@ -382,9 +403,11 @@ function renderRanking(){
   if(alunos.length===0){ el.innerHTML = '<div class="empty">Nenhum adolescente cadastrado ainda</div>'; return; }
   const rows = alunos.map(a=>({ nome:a.Nome, time:a.Time, pts: pontosPorNome(a.Nome) }))
     .sort((a,b)=>b.pts-a.pts);
+  const MEDALS = ['🥇','🥈','🥉'];
+  const MEDAL_CLASS = ['rank-gold','rank-silver','rank-bronze'];
   el.innerHTML = rows.map((r,i)=>`
-    <div class="rank-row">
-      <div class="rank-num">${i+1}</div>
+    <div class="rank-row ${MEDAL_CLASS[i]||''}">
+      <div class="rank-num">${MEDALS[i] || (i+1)}</div>
       <div style="flex:1;">
         <div class="rank-name">${escapeHtml(r.nome)}</div>
         <div class="rank-team">${escapeHtml(r.time||'')}</div>
@@ -507,19 +530,37 @@ function selectType(key, pts){
   renderTypeGrid();
 }
 
+let pontosMode = 'individual';
+
+function setPontosMode(mode){
+  pontosMode = mode;
+  document.getElementById('modeIndBtn').className = 'team-switch-btn' + (mode==='individual' ? ' sel-0' : '');
+  document.getElementById('modeEquipeBtn').className = 'team-switch-btn' + (mode==='equipe' ? ' sel-1' : '');
+  document.getElementById('alunoField').style.display = mode==='individual' ? 'block' : 'none';
+  document.getElementById('equipeField').style.display = mode==='equipe' ? 'block' : 'none';
+}
+
 function renderAlunoSelect(){
   const el = document.getElementById('pAluno');
   el.innerHTML = alunos.map(a=>`<option value="${escapeAttr(a.Nome)}" data-time="${escapeAttr(a.Time||'')}">${escapeHtml(a.Nome)}</option>`).join('');
 }
 
 async function submitPonto(){
-  const sel = document.getElementById('pAluno');
-  if(!sel.value){ toast('Cadastre e escolha um adolescente'); return; }
   if(!selectedType){ toast('Escolha o motivo'); return; }
-  const nome = sel.value;
-  const time = sel.options[sel.selectedIndex].dataset.time;
   const pontos = Number(document.getElementById('pValor').value || 0);
   const obs = document.getElementById('pObs').value.trim();
+  let nome, time;
+
+  if(pontosMode === 'equipe'){
+    time = document.getElementById('pEquipe').value;
+    nome = time;
+  } else {
+    const sel = document.getElementById('pAluno');
+    if(!sel.value){ toast('Cadastre e escolha um adolescente'); return; }
+    nome = sel.value;
+    time = sel.options[sel.selectedIndex].dataset.time;
+  }
+
   const ok = await postAction({ action:'addRegistro', nome, time, tipo:selectedType, pontos, data: todayDay(), obs });
   if(ok){
     toast('Pontuação lançada!');
