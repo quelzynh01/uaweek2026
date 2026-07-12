@@ -397,7 +397,7 @@ function renderBattleBar(){
       <div class="name" style="color:${teamColor(i)}">${escapeHtml(teamLabel(t))}</div>
       <div class="pts" style="color:${teamColor(i)}">${pts}</div>
     </div>`;
-  }).join('') + (teams.length>1 ? '<div class="battle-vs">VS</div>' : '');
+  }).join('');
 }
 
 function renderRanking(){
