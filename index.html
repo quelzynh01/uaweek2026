@@ -121,8 +121,12 @@
   .type-btn.sel{border-color:var(--gold);background:rgba(240,180,41,0.1);}
   .type-btn.sel .val{color:var(--gold);}
 
-  .log-item{padding:9px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
-  .log-item:last-child{border-bottom:none;}
+  .swipe-row{position:relative;overflow:hidden;border-bottom:1px solid var(--border);}
+  .swipe-row:last-child{border-bottom:none;}
+  .swipe-actions{position:absolute;top:0;right:0;bottom:0;width:72px;background:var(--danger);display:flex;align-items:center;justify-content:center;}
+  .swipe-del-btn{background:none;border:none;color:#fff;font-size:19px;cursor:pointer;width:100%;height:100%;}
+  .swipe-content{position:relative;background:var(--bg-elev);touch-action:pan-y;will-change:transform;}
+  .log-item{padding:9px 0;display:flex;align-items:center;gap:10px;}
   .log-item .li-text{flex:1;font-size:13px;}
   .log-item .li-text b{font-weight:700;}
   .log-item .li-sub{font-size:11px;color:var(--text-dim);}
@@ -252,6 +256,7 @@ let alunos = [];
 let registros = [];
 let selectedDay = null;
 let selectedTeam = 'Equipe 1';
+let swipeActiveEl = null, swipeStartX = 0, swipeCurrentX = 0, swipeDragging = false, swipeOpenEl = null;
 let selectedType = null;
 
 const TIPOS = [
@@ -394,12 +399,17 @@ function renderLog(){
   if(registros.length===0){ el.innerHTML = '<div class="empty">Nenhum lançamento ainda</div>'; return; }
   const sorted = [...registros].sort((a,b)=> new Date(b.Timestamp) - new Date(a.Timestamp)).slice(0,15);
   el.innerHTML = sorted.map(r=>`
-    <div class="log-item">
-      <div class="li-text">
-        <b>${escapeHtml(r.Nome)}</b> — ${escapeHtml(r.Tipo)}
-        <div class="li-sub">${r.Data?diaLabel(r.Data):''}${r.Observacao?' · '+escapeHtml(r.Observacao):''}</div>
+    <div class="swipe-row">
+      <div class="swipe-actions"><button class="swipe-del-btn" onclick="deleteRegistroLancamento('${escapeAttr(r.ID)}')">🗑</button></div>
+      <div class="swipe-content">
+        <div class="log-item">
+          <div class="li-text">
+            <b>${escapeHtml(r.Nome)}</b> — ${escapeHtml(r.Tipo)}
+            <div class="li-sub">${r.Data?diaLabel(r.Data):''}${r.Observacao?' · '+escapeHtml(r.Observacao):''}</div>
+          </div>
+          <div class="li-pts" style="color:${Number(r.Pontos)<0?'var(--danger)':'var(--success)'}">${Number(r.Pontos)>0?'+':''}${r.Pontos}</div>
+        </div>
       </div>
-      <div class="li-pts" style="color:${Number(r.Pontos)<0?'var(--danger)':'var(--success)'}">${Number(r.Pontos)>0?'+':''}${r.Pontos}</div>
     </div>
   `).join('');
 }
@@ -576,7 +586,59 @@ async function editAluno(nomeAtual, time){
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function escapeAttr(s){ return String(s).replace(/'/g, "\\'"); }
 
+function initSwipe(){
+  const container = document.getElementById('logList');
+  container.addEventListener('pointerdown', e=>{
+    const content = e.target.closest('.swipe-content');
+    if(!content) return;
+    if(swipeOpenEl && swipeOpenEl !== content) closeSwipe(swipeOpenEl);
+    swipeActiveEl = content;
+    swipeStartX = e.clientX;
+    swipeCurrentX = swipeOpenEl === content ? -72 : 0;
+    swipeDragging = true;
+    content.style.transition = 'none';
+    try{ content.setPointerCapture(e.pointerId); }catch(err){}
+  });
+  container.addEventListener('pointermove', e=>{
+    if(!swipeDragging || !swipeActiveEl) return;
+    const delta = swipeCurrentX + (e.clientX - swipeStartX);
+    const clamped = Math.max(-72, Math.min(0, delta));
+    swipeActiveEl.style.transform = `translateX(${clamped}px)`;
+    swipeActiveEl.dataset.x = clamped;
+  });
+  const endDrag = ()=>{
+    if(!swipeDragging || !swipeActiveEl) return;
+    const x = Number(swipeActiveEl.dataset.x || 0);
+    swipeActiveEl.style.transition = 'transform .18s ease';
+    if(x < -36){
+      swipeActiveEl.style.transform = 'translateX(-72px)';
+      swipeOpenEl = swipeActiveEl;
+    } else {
+      swipeActiveEl.style.transform = 'translateX(0)';
+      if(swipeOpenEl === swipeActiveEl) swipeOpenEl = null;
+    }
+    swipeDragging = false;
+    swipeActiveEl = null;
+  };
+  container.addEventListener('pointerup', endDrag);
+  container.addEventListener('pointercancel', endDrag);
+}
+
+function closeSwipe(el){
+  el.style.transition = 'transform .18s ease';
+  el.style.transform = 'translateX(0)';
+}
+
+async function deleteRegistroLancamento(id){
+  if(!confirm('Excluir este lançamento?')) return;
+  swipeOpenEl = null;
+  await postAction({ action:'deleteRegistro', id });
+  toast('Lançamento excluído');
+  await loadData();
+}
+
 init();
+initSwipe();
 </script>
 </body>
 </html>
